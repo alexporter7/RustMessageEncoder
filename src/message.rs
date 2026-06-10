@@ -4,6 +4,14 @@ pub mod message {
     use std::fs::File;
     use std::io::{Read, Write};
 
+
+    #[derive(Encode, Decode, Debug)]
+    pub struct MessageBinary {
+        pub mes_all_read:   bool,
+        pub mes_in_binary:  i32,
+        pub messages:       Vec<Message>
+    }
+
     #[derive(Encode, Decode, Debug)]
     pub struct Message {
         pub metadata:   MessageMetadata,
@@ -14,10 +22,26 @@ pub mod message {
 
     #[derive(Encode, Decode, Debug)]
     pub struct MessageMetadata {
-        pub created: u32,
-        pub shifts: i32,
-        pub has_read: bool,
+        pub created:        u32,
+        pub shifts:         i32,
+        pub has_read:       bool,
         pub read_timestamp: Option<u32>,
+
+    }
+
+    impl MessageBinary {
+
+        pub fn default() -> Self {
+            Self {
+                mes_all_read: false,
+                mes_in_binary: 0,
+                messages: Vec::new()
+            }
+        }
+
+        pub fn archive(path: &str) {
+            //close references to binary (if necessary) and move to archived folder
+        }
 
     }
 
