@@ -1,63 +1,80 @@
 pub mod message {
-    use std::fmt::{write, Formatter};
+    use oxicode::{Decode, Encode};
+    use std::fmt::Formatter;
     use std::fs::File;
     use std::io::{Read, Write};
 
+    #[derive(Encode, Decode, Debug)]
     pub struct Message {
-        pub created:    DateTime<Utc>,
-        pub encoded:    bool,
-        pub shifts:     int,
+        pub metadata:   MessageMetadata,
         pub author:     String,
         pub name:       String,
         pub content:    String,
     }
 
+    #[derive(Encode, Decode, Debug)]
+    pub struct MessageMetadata {
+        pub created: u32,
+        pub shifts: i32,
+        pub has_read: bool,
+        pub read_timestamp: Option<u32>,
+
+    }
+
     impl Message {
-        pub fn new(created: DateTime<Utc>, encoded: bool, shifts: int,
-                   author: String, name: String, content: String) -> Self {
-            Self { created, encoded, shifts, author, name, content }
+
+        pub fn new(metadata: MessageMetadata, author: String, name: String, content: String) -> Self {
+            Self { metadata, author, name, content }
         }
 
-        pub fn from(path: &str) {
+        pub fn from(path: &str) -> Self {
             let mut file = File::open(path)
-                .expect("Unable to open file at {}", path);
+                .expect("Unable to open file");
 
-            file.read(&Self.created).expect("Unable to read file");
-            file.read(&Self.encoded).expect("Unable to read file");
-            file.read(&Self.shifts).expect("Unable to read file");
-            file.read(&Self.author).expect("Unable to read file");
-            file.read(&Self.name).expect("Unable to read file");
-            file.read(&Self.content).expect("Unable to read file");
-            
-            
+            let mut data_buffer = String::new();
+            file.read_to_string(&mut data_buffer)
+                .expect("Error reading data into buffer");
+
+            let (m, _): (Message, _) = oxicode::decode_from_hex(&data_buffer)
+                .expect("Error decoding bin contents");
+
+            return m;
         }
 
-        pub fn decode() {
+        pub fn write_bin(&self) {
 
-        }
+            /* Get proper file name */
+            let mut file_name = String::from(&self.name.as_str()
+                .replace(" ", ""));
+            file_name.push_str(".bin");
 
-        pub fn write_bin() {
-            let mut file = File::create(
-                String::from(&Self.name).push_str(".bin"))
+            /* Create File */
+            let mut file = File::create(file_name)
                 .expect("Unable to create file");
-            file.write_all(&Self.created).expect("Unable to write to file");
-            file.write_all(&Self.encoded).expect("Unable to write to file");
-            file.write_all(&Self.shifts).expect("Unable to write to file");
-            file.write_all(&Self.author).expect("Unable to write to file");
-            file.write_all(&Self.name).expect("Unable to write to file");
-            file.write_all(&Self.content).expect("Unable to write to file");
 
+            /* Write Data */
+            let data = oxicode::encode_to_hex(self)
+                .expect("Error encoding struct");
+            file.write_all(data.as_bytes())
+                .expect("Error writing to file");
+
+        }
+    }
+
+    impl MessageMetadata {
+        pub fn new(created: u32, shifts: i32, has_read: bool, read_timestamp: Option<u32>) -> Self {
+            Self { created, shifts, has_read, read_timestamp }
         }
     }
 
     impl std::fmt::Display for Message {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write(f, "\
+            write!(f, "\
             Name: {}\n\
             Created: {}\n\
-            Author: {}\n,\
+            Author: {}\n\
             Content:\n\
-            {}", self.name, self.created, self.author, self.content);
+            {}", self.name, "N/A", self.author, self.content)
         }
     }
 }
