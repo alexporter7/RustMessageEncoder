@@ -66,17 +66,17 @@ pub mod menu {
 }
 
 pub mod terminal_ui {
-    use std::io;
-    use std::ops::Deref;
-    use ratatui::{DefaultTerminal, Frame};
     use ratatui::buffer::Buffer;
     use ratatui::crossterm::style::Stylize;
-    use ratatui::layout::Rect;
-    use ratatui::prelude::Span;
+    use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::Style;
-    use ratatui::symbols::border;
-    use ratatui::text::Line;
     use ratatui::widgets::{Block, Paragraph, Widget};
+    use ratatui::{DefaultTerminal, Frame};
+    use std::io;
+    use ratatui::crossterm::event;
+    use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+    use ratatui::text::Line;
+    use log::error;
 
     #[derive(Debug, Default)]
     pub struct MessageViewScreen {
@@ -112,6 +112,10 @@ pub mod terminal_ui {
                 .expect("Error starting MessageViewScreen");
         }
 
+        pub fn exit(&mut self) {
+            self.exit = true;
+        }
+
         pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()>{
 
             while !self.exit {
@@ -127,46 +131,114 @@ pub mod terminal_ui {
         }
 
         fn handle_events(&mut self) -> io::Result<()> {
+            match event::read()? {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                  self.handle_key_event(key_event) },
+                _ => {}
+            };
             Ok(())
+        }
+
+        fn handle_key_event(&mut self, key_event: KeyEvent) {
+            match key_event.code {
+                KeyCode::Esc => self.exit(),
+                _ => {}
+            }
+        }
+
+        fn get_message_lines(&self) -> Vec<Line<'static>> {
+            let _lines: Vec<Line<'static>> = vec![
+                "Create New Message".into(),
+                "Message 1".into(),
+                "Message 2".into()
+            ];
+            _lines
         }
 
     }
 
     impl Widget for &MessageViewScreen {
         fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-            let mut title = Line::from("test");
+
+            let title_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(90)
+                ])
+                .split(area);
+
+            let column_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(50)])
+                .split(title_layout[1]);
+
+            let binary_overview_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)
+                ])
+                .split(column_layout[0]);
+
+            let messages_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)
+                ])
+                .split(column_layout[1]);
+
+            let message_pane_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)
+                ])
+                .split(column_layout[2]);
 
 
-            let mut test: Vec<Span> = Vec::new();
+            let _styled = Block::bordered()
+                .style(Style::new().bold().light_blue());
+
+            /* Title Paragraph */
+            Paragraph::new("Rust Message Encoder").centered().block(
+                _styled.clone()).render(title_layout[0], buf);
 
 
-            let t: Vec<Span> = vec![
-                " Decrement ".into(),
-                "<Left>".into(),
-                " Increment ".into(),
-                "<Right>".into(),
-                " Quit ".into(),
-                "<Q> ".into(),
-            ];
+            /* Binary Overview */
+            Paragraph::new("")
+                .block(_styled.clone())
+                .render(column_layout[0], buf);
+            Paragraph::new(" Binary Overview ")
+                .centered()
+                .render(binary_overview_layout[0], buf);
+
+            /* Messages */
+            Paragraph::new("")
+                .block(_styled.clone())
+                .render(column_layout[1], buf);
+            Paragraph::new(" Messages ")
+                .centered()
+                .render(messages_layout[0], buf);
+            Paragraph::new(self.get_message_lines())
+                .centered()
+                .render(messages_layout[1], buf);
+
+            /* View Message Pane */
+            Paragraph::new("")
+                .block(_styled.clone())
+                .render(column_layout[2], buf);
+            Paragraph::new(" View Message ")
+                .centered()
+                .render(message_pane_layout[0], buf);
 
 
-
-            let mut _bottom_title = String::from("Viewing [");
-            _bottom_title.push_str(&self.file_name.as_str());
-            _bottom_title.push_str("] ");
-
-            let s = Style::new().bold().blue();
-
-
-            let instructions = Line::styled(_bottom_title.as_str(), s);
-
-            let block = Block::bordered()
-                .title(title.centered())
-                .title_bottom(instructions.centered())
-                .border_set(border::THICK);
-
-            Paragraph::new("testing paragraph").centered().block(block).render(area, buf)
         }
+
     }
 
 }

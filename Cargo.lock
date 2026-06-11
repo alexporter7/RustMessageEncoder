@@ -11,6 +11,7 @@ dependencies = [
  "console 0.15.11",
  "console-menu",
  "dialoguer",
+ "log",
  "oxicode",
  "ratatui",
  "serde",
