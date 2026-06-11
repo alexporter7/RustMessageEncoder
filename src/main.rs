@@ -7,19 +7,12 @@ pub mod menu;
 pub mod app;
 pub mod test_menu;
 pub mod form;
-
-
+pub mod util;
 
 fn main() {
-
-    form::message_binary_form::binary_wizard();
-
+    
     let mut config = app::app_config::get_config();
-    //show_main_menu();
-
-
-
-    println!("{}", config.get("mode").unwrap());
+    show_main_menu();
 
     //check if there is an app.bin file
         //if there is not create a blank one
