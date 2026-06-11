@@ -3,13 +3,20 @@ pub mod message {
     use std::fmt::Formatter;
     use std::fs::File;
     use std::io::{Read, Write};
-
+    use crate::app::app_config::get_option;
 
     #[derive(Encode, Decode, Debug)]
     pub struct MessageBinary {
         pub mes_all_read:   bool,
         pub mes_in_binary:  i32,
+        pub name:           String,
+        pub file_name:      String,
         pub messages:       Vec<Message>
+    }
+
+    #[derive(Encode, Decode, Debug)]
+    pub struct MessageBinaryMetadata {
+        //TODO
     }
 
     #[derive(Encode, Decode, Debug)]
@@ -33,14 +40,41 @@ pub mod message {
 
         pub fn default() -> Self {
             Self {
-                mes_all_read: false,
-                mes_in_binary: 0,
-                messages: Vec::new()
+                mes_all_read:   false,
+                mes_in_binary:  0,
+                name:           String::from("Default Name"),
+                file_name:      String::from("default.bin"),
+                messages:       Vec::new()
             }
         }
 
-        pub fn archive(path: &str) {
+        pub fn from_empty(name: String, file_name: String) -> Self {
+            Self {
+                mes_all_read:   false,
+                mes_in_binary:  0,
+                name,
+                file_name,
+                messages:       Vec::new()
+            }
+        }
+
+        pub fn archive_binary(path: &str) {
             //close references to binary (if necessary) and move to archived folder
+        }
+
+        pub fn write_bin(&self) {
+            let base_path = get_option(&"message_binary_path".to_string());
+
+            /* Create File */
+            let mut file = File::create(base_path + "/" + &self.file_name)
+                .expect("Unable to create file");
+
+            /* Write Data */
+            let data = oxicode::encode_to_hex(self)
+                .expect("Error encoding struct");
+            file.write_all(data.as_bytes())
+                .expect("Error writing to file");
+
         }
 
     }
@@ -65,6 +99,7 @@ pub mod message {
             return m;
         }
 
+        //TODO: remove from message add to message binary
         pub fn write_bin(&self) {
 
             /* Get proper file name */
