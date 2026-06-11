@@ -1,9 +1,9 @@
 pub mod message {
+    use crate::app::app_config::get_option;
     use oxicode::{Decode, Encode};
     use std::fmt::Formatter;
     use std::fs::File;
     use std::io::{Read, Write};
-    use crate::app::app_config::get_option;
 
     #[derive(Encode, Decode, Debug)]
     pub struct MessageBinary {
@@ -60,6 +60,7 @@ pub mod message {
 
         pub fn archive_binary(path: &str) {
             //close references to binary (if necessary) and move to archived folder
+            println!("not implemented {path}");
         }
 
         pub fn write_bin(&self) {

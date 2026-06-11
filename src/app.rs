@@ -1,7 +1,6 @@
 pub mod app_config {
-    use std::collections::HashMap;
     use config::Config;
-    use serde::Serialize;
+    use std::collections::HashMap;
 
     pub fn get_config() -> HashMap<String, String> {
         let settings = Config::builder()
@@ -25,7 +24,7 @@ pub mod app_config {
     }
 
     pub fn save_config(config: HashMap<String, String>) {
-        //TODO: need to re-serialize config
+        println!("{}", config.len());
     }
 
 }
