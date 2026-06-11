@@ -75,8 +75,181 @@ pub mod terminal_ui {
     use std::io;
     use ratatui::crossterm::event;
     use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-    use ratatui::text::Line;
-    use log::error;
+    use ratatui::text::{Line, Span};
+
+
+
+    #[derive(Debug, Default)]
+    pub struct MessageScreen {
+        file_name: String,
+        bin_data: Vec<Vec<String>>,
+        exit: bool,
+        active_pane: i32,
+        active_index: i32
+    }
+
+    impl MessageScreen {
+
+        const BINARY_PANE: i32 = 0;
+        const MESSAGES_PANE: i32 = 1;
+        const VIEW_PANE: i32 = 2;
+
+        const PG_DEFAULT_STYLE: Style = Style::new().light_blue();
+
+        pub fn from_empty() -> Self {
+
+            let _data: Vec<Vec<String>> = vec![
+                Vec::new(),
+                Vec::new(),
+                Vec::new()
+            ];
+
+            Self {
+                file_name: String::from("TestFileName.bin"),
+                bin_data: _data,
+                exit: false,
+                active_pane: Self::MESSAGES_PANE,
+                active_index: 0
+            }
+        }
+
+        pub fn exit(&mut self) {
+            self.exit = true;
+        }
+
+        pub fn render_title(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            /* Title Paragraph */
+            Paragraph::new("Rust Message Encoder")
+                .centered()
+                .block(block).render(area, buf);
+        }
+
+        pub fn render_binary_overview(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            let binary_overview_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)])
+                .split(area);
+
+            /* Binary Overview */
+            Paragraph::new("")
+                .block(block)
+                .render(area, buf);
+            Paragraph::new(" Binary Overview ")
+                .centered()
+                .render(binary_overview_layout[0], buf);
+        }
+
+        pub fn render_messages_pane(&self, block: Block,
+                                    area: Rect, buf: &mut Buffer) {
+
+            let messages_pane_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)])
+                .split(area);
+
+            /* Messages */
+            Paragraph::new("")
+                .block(block)
+                .render(area, buf);
+            Paragraph::new(" Messages ")
+                .centered()
+                .render(messages_pane_layout[0], buf);
+            Paragraph::new(vec![
+                Line::styled("Create New Message", Self::PG_DEFAULT_STYLE),
+                Line::styled("Message 1", Self::PG_DEFAULT_STYLE),
+                Line::styled("Message 2", Self::PG_DEFAULT_STYLE),
+            ])
+                .centered()
+                .render(messages_pane_layout[1], buf);
+        }
+
+        pub fn render_view_pane(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            let view_pane_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(95)])
+                .split(area);
+
+            /* View Message Pane */
+            Paragraph::new("")
+                .block(block)
+                .render(area, buf);
+            Paragraph::new(" View Message ")
+                .centered()
+                .render(view_pane_layout[0], buf);
+        }
+
+        pub fn load(&mut self) {
+            ratatui::run(|terminal| self.run(terminal))
+                .expect("Error starting MessageViewScreen");
+        }
+
+        pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+
+            while !self.exit {
+                terminal.draw(|frame| self.draw(frame))?;
+                self.handle_events()?;
+            }
+
+            Ok(())
+        }
+
+        fn draw(&self, frame: &mut Frame) {
+            frame.render_widget(self, frame.area());
+        }
+
+        fn handle_events(&mut self) -> io::Result<()> {
+            match event::read()? {
+                Event::Key(key_event) => {
+                    match key_event.kind {
+                        KeyEventKind::Press => self.handle_key_press_event(key_event),
+                        _ => {} } }
+                _ => { }
+            }
+            Ok(())
+        }
+
+        pub fn handle_key_press_event(&mut self, key_event: KeyEvent) {
+            match key_event.code {
+                KeyCode::Esc | KeyCode::Char('q') => { self.exit() }
+                _ => { }
+            }
+        }
+
+    }
+
+    impl Widget for &MessageScreen {
+        fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
+            let title_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(90)])
+                .split(area);
+
+            let column_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(50)])
+                .split(title_layout[1]);
+
+            let _styled = Block::bordered()
+                .style(Style::new().bold().light_blue());
+
+            self.render_title(_styled.clone(), title_layout[0], buf);
+            self.render_binary_overview(_styled.clone(), column_layout[0], buf);
+            self.render_messages_pane(_styled.clone(), column_layout[1], buf);
+            self.render_view_pane(_styled.clone(), column_layout[2], buf);
+
+        }
+    }
 
     #[derive(Debug, Default)]
     pub struct MessageViewScreen {
@@ -132,7 +305,8 @@ pub mod terminal_ui {
 
         fn handle_events(&mut self) -> io::Result<()> {
             match event::read()? {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                Event::Key(key_event)
+                if key_event.kind == KeyEventKind::Press => {
                   self.handle_key_event(key_event) },
                 _ => {}
             };
@@ -142,13 +316,19 @@ pub mod terminal_ui {
         fn handle_key_event(&mut self, key_event: KeyEvent) {
             match key_event.code {
                 KeyCode::Esc => self.exit(),
+                KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right => {
+                    self.handle_user_input(key_event) }
                 _ => {}
             }
         }
 
+        fn handle_user_input(&mut self, key_event: KeyEvent) {
+
+        }
+
         fn get_message_lines(&self) -> Vec<Line<'static>> {
             let _lines: Vec<Line<'static>> = vec![
-                "Create New Message".into(),
+                Line::styled("Create New Message", Style::new().reversed()),
                 "Message 1".into(),
                 "Message 2".into()
             ];
@@ -164,8 +344,7 @@ pub mod terminal_ui {
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(10),
-                    Constraint::Percentage(90)
-                ])
+                    Constraint::Percentage(90)])
                 .split(area);
 
             let column_layout = Layout::default()
@@ -180,24 +359,21 @@ pub mod terminal_ui {
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(5),
-                    Constraint::Percentage(95)
-                ])
+                    Constraint::Percentage(95)])
                 .split(column_layout[0]);
 
             let messages_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(5),
-                    Constraint::Percentage(95)
-                ])
+                    Constraint::Percentage(95)])
                 .split(column_layout[1]);
 
             let message_pane_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(5),
-                    Constraint::Percentage(95)
-                ])
+                    Constraint::Percentage(95)])
                 .split(column_layout[2]);
 
 
@@ -235,7 +411,6 @@ pub mod terminal_ui {
             Paragraph::new(" View Message ")
                 .centered()
                 .render(message_pane_layout[0], buf);
-
 
         }
 

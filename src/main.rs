@@ -1,5 +1,5 @@
 use crate::menu::menu::show_main_menu;
-use crate::menu::terminal_ui::MessageViewScreen;
+use crate::menu::terminal_ui::{MessageScreen, MessageViewScreen};
 
 pub mod message;
 pub mod menu;
@@ -9,9 +9,13 @@ pub mod util;
 
 fn main() {
 
-    let mut mvc = MessageViewScreen::from_empty();
+    // let mut mvc = MessageViewScreen::from_empty();
+    //
+    // mvc.load();
 
-    mvc.load();
+    let mut mvc2 = MessageScreen::from_empty();
+    mvc2.load();
+
 
     //mvc.load();
 
