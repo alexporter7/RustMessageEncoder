@@ -66,6 +66,7 @@ pub mod menu {
 }
 
 pub mod message_view_ui {
+    use std::cmp::min;
     use crate::menu::binary_select_ui::BinarySelectScreen;
     use ratatui::buffer::Buffer;
     use ratatui::crossterm::event;
@@ -77,24 +78,32 @@ pub mod message_view_ui {
     use ratatui::widgets::{Block, Paragraph, Widget};
     use ratatui::{DefaultTerminal, Frame};
     use std::io;
+    use rand::distributions::uniform::SampleBorrow;
+    use crate::message::message::MessageBinary;
+    use crate::util::term_util::ScrollDirection;
 
     #[derive(Debug, Default)]
     pub struct MessageScreen {
-        file_name: String,
+        loaded_binary: Option<MessageBinary>,
         bin_data: Vec<Vec<String>>,
         exit: bool,
-        active_pane: i32,
-        active_index: i32,
-        current_screen: bool
+        active_pane: usize,
+        active_index: usize,
+        current_screen: bool,
+        scroll_direction: ScrollDirection,
+        last_offset: usize
     }
 
     impl MessageScreen {
 
-        const BINARY_PANE: i32 = 0;
-        const MESSAGES_PANE: i32 = 1;
-        const VIEW_PANE: i32 = 2;
+        const BINARY_PANE: usize = 0;
+        const MESSAGES_PANE: usize = 1;
+        const VIEW_PANE: usize = 2;
 
         const PG_DEFAULT_STYLE: Style = Style::new().light_blue();
+        const PG_FOCUS_STYLE:   Style = Style::new().bold().light_blue().reversed();
+
+        const MAX_MESSAGE_LINES: usize = 22;
 
         pub fn from_empty() -> Self {
 
@@ -105,17 +114,55 @@ pub mod message_view_ui {
             ];
 
             Self {
-                file_name: String::from("TestFileName.bin"),
+                loaded_binary: Some(MessageBinary::from_empty("Test Binary".to_string(),
+                                                              "test_file.bin".to_string())),
                 bin_data: _data,
                 exit: false,
                 active_pane: Self::MESSAGES_PANE,
                 active_index: 0,
-                current_screen: true
+                current_screen: true,
+                scroll_direction: ScrollDirection::None,
+                last_offset: 0
             }
         }
 
         pub fn exit(&mut self) {
             self.exit = true;
+        }
+
+        pub fn load_binary(&mut self, bin: MessageBinary) {
+            self.loaded_binary = Some(bin);
+            let mut _data = self.bin_data.get_mut(Self::MESSAGES_PANE).unwrap();
+
+            let _messages = &self.loaded_binary.as_ref().unwrap().messages;
+            for message in _messages {
+                _data.push(message.name.clone());
+            }
+
+        }
+
+        pub fn set_last_offset(&mut self, offset: usize) {
+            self.last_offset = offset;
+        }
+
+        pub fn get_offset(&self) -> usize {
+            let mut _offset: usize = 0;
+
+            if self.active_index > (Self::MAX_MESSAGE_LINES - 1) {
+                if matches!(self.scroll_direction, ScrollDirection::Down){
+                    _offset = self.active_index - (Self::MAX_MESSAGE_LINES - 1);
+                }
+
+                if matches!(self.scroll_direction, ScrollDirection::Up) {
+                    if self.active_index < self.last_offset {
+                        _offset = self.last_offset - 1;
+                    } else {
+                        _offset = self.last_offset;
+                    }
+                }
+            }
+
+            _offset
         }
 
         pub fn render_title(&self, block: Block, area: Rect, buf: &mut Buffer) {
@@ -126,12 +173,24 @@ pub mod message_view_ui {
         }
 
         pub fn render_binary_overview(&self, block: Block, area: Rect, buf: &mut Buffer) {
+
             let binary_overview_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
-                    Constraint::Percentage(5),
-                    Constraint::Percentage(95)])
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(90)])
                 .split(area);
+
+            let _bin = self.loaded_binary.as_ref().unwrap();
+
+            let _bin_name = format!("Binary Name: {}", _bin.name);
+            let _mes_in_bin = format!("Messages in Binary: {}", _bin.mes_in_binary);
+
+            let _binary_overview_lines = vec![
+                //Line::styled(" Binary Overview ", Self::PG_DEFAULT_STYLE),
+                Line::styled(_bin_name, Self::PG_DEFAULT_STYLE),
+                Line::styled(_mes_in_bin, Self::PG_DEFAULT_STYLE),
+            ];
 
             /* Binary Overview */
             Paragraph::new("")
@@ -140,6 +199,9 @@ pub mod message_view_ui {
             Paragraph::new(" Binary Overview ")
                 .centered()
                 .render(binary_overview_layout[0], buf);
+            Paragraph::new(_binary_overview_lines)
+                .centered()
+                .render(binary_overview_layout[1], buf);
         }
 
         pub fn render_messages_pane(&self, block: Block,
@@ -152,6 +214,40 @@ pub mod message_view_ui {
                     Constraint::Percentage(95)])
                 .split(area);
 
+
+            let mut _lines: Vec<Line> = Vec::new();
+
+            let _bin = self.loaded_binary.as_ref().unwrap();
+            let _bin_data = self.bin_data.get(Self::MESSAGES_PANE).unwrap();
+            let _mes_in_bin = self.loaded_binary.as_ref().unwrap().mes_in_binary;
+
+            let _max_iterations = min(_mes_in_bin, Self::MAX_MESSAGE_LINES as i32);
+
+
+            for i in 0.._max_iterations as usize {
+                let mut _offset: usize = self.get_offset();
+                // if self.active_index < (Self::MAX_MESSAGE_LINES - 1) {
+                //     _offset = 0;
+                //
+                // } else {
+                //     _offset = self.active_index - (Self::MAX_MESSAGE_LINES - 1);
+                // }
+
+                let _adjusted_index = i + _offset;
+                let _mes = _bin_data.get(_adjusted_index).unwrap();
+
+                if self.active_pane == Self::MESSAGES_PANE && self.active_index == _adjusted_index {
+                    _lines.push(Line::styled(_mes, Self::PG_FOCUS_STYLE));
+                } else {
+                    _lines.push(Line::styled(_mes, Self::PG_DEFAULT_STYLE));
+                }
+
+            }
+
+            // for message in _bin_data {
+            //     _lines.push(Line::styled(message, Self::PG_DEFAULT_STYLE));
+            // }
+
             /* Messages */
             Paragraph::new("")
                 .block(block)
@@ -159,6 +255,10 @@ pub mod message_view_ui {
             Paragraph::new(" Messages ")
                 .centered()
                 .render(messages_pane_layout[0], buf);
+
+            Paragraph::new(_lines)
+                .centered()
+                .render(messages_pane_layout[1], buf);
         }
 
         pub fn render_view_pane(&self, block: Block, area: Rect, buf: &mut Buffer) {
@@ -176,6 +276,12 @@ pub mod message_view_ui {
             Paragraph::new(" View Message ")
                 .centered()
                 .render(view_pane_layout[0], buf);
+
+            // Paragraph::new(vec![
+            //     Line::styled(format!("Last Offset: {}", self.last_offset), Self::PG_DEFAULT_STYLE),
+            //     Line::styled(format!("Active Index: {}", self.active_index), Self::PG_DEFAULT_STYLE)])
+            //     .centered()
+            //     .render(view_pane_layout[1], buf);
         }
 
         pub fn render_footer(&self, block: Block, area: Rect, buf: &mut Buffer) {
@@ -221,6 +327,22 @@ pub mod message_view_ui {
                 KeyCode::Esc | KeyCode::Char('q') => { self.exit() }
                 KeyCode::Char('o') => { BinarySelectScreen::new().load(); self.current_screen = false }
                 KeyCode::Char('n') => {}
+                KeyCode::Up => {
+                    if self.active_index > 0 {
+                        self.active_index -= 1;
+                        self.scroll_direction = ScrollDirection::Up;
+                        self.last_offset = self.get_offset();
+                    }
+
+                }
+                KeyCode::Down => {
+                    let _num_messages = self.loaded_binary.as_ref().unwrap().mes_in_binary - 1;
+                    if self.active_index < _num_messages as usize {
+                        self.active_index += 1;
+                        self.last_offset = self.get_offset();
+                        self.scroll_direction = ScrollDirection::Down
+                    }
+                }
                 _ => { }
             }
         }
@@ -261,7 +383,7 @@ pub mod message_view_ui {
 }
 
 pub mod binary_select_ui {
-    use crate::app::app_config::get_option;
+    use crate::app::app_config::{get_option, MESSAGE_BINARY_PATH};
     use crate::menu::message_view_ui::MessageScreen;
     use ratatui::buffer::Buffer;
     use ratatui::crossterm::event;
@@ -273,6 +395,7 @@ pub mod binary_select_ui {
     use ratatui::{DefaultTerminal, Frame};
     use std::io;
     use crate::app::app_config;
+    use crate::message::message;
     use crate::util::file_util::get_directory_files;
 
     #[derive(Debug, Default)]
@@ -297,6 +420,25 @@ pub mod binary_select_ui {
             self.binaries = get_directory_files(
                 &get_option(&app_config::MESSAGE_BINARY_PATH.to_string()));
 
+        }
+
+        pub fn load_message_binary(&mut self) {
+            //create message binary struct
+            let _index = self.focused_index as usize;
+            let bin = message::MessageBinary::from_file(
+                self.binaries.get(_index)
+                    .expect("Unable to get binary at selected index")
+            );
+
+            //exit this screen
+            self.current_screen = false;
+
+            //load message view screen
+            let mut message_screen = MessageScreen::from_empty();
+            message_screen.load_binary(bin);
+            message_screen.load();
+
+            //populate
         }
 
         pub fn get_message_widget_lines(&self) -> Vec<Line<'static>> {
@@ -362,7 +504,9 @@ pub mod binary_select_ui {
         pub fn handle_key_press_event(&mut self, key_event: KeyEvent) {
             match key_event.code {
                 KeyCode::Esc | KeyCode::Char('q') => { self.current_screen = false; MessageScreen::from_empty().load() }
-                KeyCode::Enter => { }
+                KeyCode::Enter => {
+                    self.load_message_binary()
+                }
                 KeyCode::Down => {
                     let _total_binaries: i32 = self.binaries.len() as i32;
                     if self.focused_index < (_total_binaries - 1) {

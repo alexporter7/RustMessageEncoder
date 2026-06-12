@@ -76,4 +76,12 @@ pub mod term_util {
 
     }
 
+    #[derive(Debug, Default)]
+    pub enum ScrollDirection {
+        #[default]
+        None,
+        Up,
+        Down
+    }
+
 }

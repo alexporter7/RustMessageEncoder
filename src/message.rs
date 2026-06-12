@@ -5,7 +5,7 @@ pub mod message {
     use std::fs::File;
     use std::io::{Read, Write};
 
-    #[derive(Encode, Decode, Debug)]
+    #[derive(Encode, Decode, Debug, Default)]
     pub struct MessageBinary {
         pub mes_all_read:   bool,
         pub mes_in_binary:  i32,
