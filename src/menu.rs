@@ -159,13 +159,6 @@ pub mod message_view_ui {
             Paragraph::new(" Messages ")
                 .centered()
                 .render(messages_pane_layout[0], buf);
-            Paragraph::new(vec![
-                Line::styled("Create New Message", Self::PG_DEFAULT_STYLE),
-                Line::styled("Message 1", Self::PG_DEFAULT_STYLE),
-                Line::styled("Message 2", Self::PG_DEFAULT_STYLE),
-            ])
-                .centered()
-                .render(messages_pane_layout[1], buf);
         }
 
         pub fn render_view_pane(&self, block: Block, area: Rect, buf: &mut Buffer) {
@@ -274,27 +267,62 @@ pub mod binary_select_ui {
     use ratatui::crossterm::event;
     use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
     use ratatui::layout::{Layout, Rect};
-    use ratatui::prelude::{Constraint, Direction, Widget};
+    use ratatui::prelude::{Constraint, Direction, Line, Widget};
     use ratatui::style::Style;
     use ratatui::widgets::{Block, Paragraph};
     use ratatui::{DefaultTerminal, Frame};
     use std::io;
+    use crate::app::app_config;
+    use crate::util::file_util::get_directory_files;
 
     #[derive(Debug, Default)]
     pub struct BinarySelectScreen {
         exit:       bool,
         binaries:   Vec<String>,
-        current_screen: bool
+        current_screen: bool,
+        focused_index: i32
     }
 
     impl BinarySelectScreen {
 
         pub fn new() -> Self {
-            Self { exit: false, binaries: Vec::new(), current_screen: true }
+            Self { exit: false, binaries: Vec::new(), current_screen: true, focused_index: 0 }
         }
 
         pub fn exit(&mut self) {
             self.exit = true;
+        }
+
+        pub fn get_message_binaries(&mut self) {
+            self.binaries = get_directory_files(
+                &get_option(&app_config::MESSAGE_BINARY_PATH.to_string()));
+
+        }
+
+        pub fn get_message_widget_lines(&self) -> Vec<Line<'static>> {
+            let mut lines: Vec<Line<'static>> = Vec::new();
+
+            let mut i = 0;
+            for file in &self.binaries {
+                let _base_path = get_option(&app_config::MESSAGE_BINARY_PATH.to_string());
+                let mut _file_name = String::from(_base_path);
+                _file_name.push_str("/");
+                _file_name.push_str(file.as_str());
+
+                let default_style = Style::new().light_blue();
+                let focused_style = Style::new().light_blue().bold().reversed();
+
+                if i == self.focused_index {
+                    lines.push(Line::styled(_file_name, focused_style)); }
+                else {
+                    lines.push(Line::styled(_file_name, default_style));
+                }
+
+
+                i += 1;
+            }
+
+            lines
         }
 
         pub fn load(&mut self) {
@@ -303,6 +331,8 @@ pub mod binary_select_ui {
         }
 
         pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+
+            self.get_message_binaries();
 
             while !self.exit && self.current_screen {
                 terminal.draw(|frame| self.draw(frame))?;
@@ -333,6 +363,16 @@ pub mod binary_select_ui {
             match key_event.code {
                 KeyCode::Esc | KeyCode::Char('q') => { self.current_screen = false; MessageScreen::from_empty().load() }
                 KeyCode::Enter => { }
+                KeyCode::Down => {
+                    let _total_binaries: i32 = self.binaries.len() as i32;
+                    if self.focused_index < (_total_binaries - 1) {
+                        self.focused_index += 1; }
+                }
+                KeyCode::Up => {
+                    let _total_binaries: i32 = self.binaries.len() as i32;
+                    if self.focused_index != 0 {
+                        self.focused_index -= 1; }
+                }
                 _ => { }
             }
         }
@@ -358,7 +398,11 @@ pub mod binary_select_ui {
 
             Paragraph::new(_t)
                 .centered()
-                .block(block).render(area, buf);
+                .block(block.clone()).render(area, buf);
+
+            Paragraph::new(self.get_message_widget_lines())
+                .centered()
+                .block(block.clone()).render(area, buf);
         }
     }
 

@@ -1,6 +1,5 @@
 use crate::menu::message_view_ui::MessageScreen;
 use chrono::Timelike;
-use crate::app::app_state::{AppState, Screen};
 
 pub mod message;
 pub mod menu;
@@ -9,8 +8,6 @@ pub mod form;
 pub mod util;
 
 fn main() {
-
-    let mut current_screen = AppState::new();
 
     let mut mvc2 = MessageScreen::from_empty();
     mvc2.load();

@@ -2,6 +2,8 @@ pub mod app_config {
     use config::Config;
     use std::collections::HashMap;
 
+    pub const MESSAGE_BINARY_PATH: &str = "message_binary_path";
+
     pub fn get_config() -> HashMap<String, String> {
         let settings = Config::builder()
             .add_source(config::File::with_name("config.toml"))
@@ -46,35 +48,12 @@ pub mod app_data {
 }
 
 pub mod app_files {
+    use ratatui::prelude::Line;
+    use crate::app::app_config;
+    use crate::app::app_config::get_option;
+    use crate::util::file_util::get_directory_files;
 
-    pub fn get_message_pages() {
-
-    }
-
-}
-
-pub mod app_state {
-    pub enum Screen {
-        None,
-        ViewMessageScreen,
-        OpenBinaryScreen,
-        NewMessageScreen
-    }
-
-    pub struct AppState {
-        current_screen: Screen
-    }
-
-    impl AppState {
-
-        pub fn new() -> Self {
-            Self { current_screen: Screen::None}
-        }
-
-        pub fn get_app_screen(&mut self) -> &Screen {
-            &self.current_screen
-        }
-    }
 
 
 }
+
