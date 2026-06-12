@@ -65,19 +65,18 @@ pub mod menu {
 
 }
 
-pub mod terminal_ui {
+pub mod message_view_ui {
+    use crate::menu::binary_select_ui::BinarySelectScreen;
     use ratatui::buffer::Buffer;
+    use ratatui::crossterm::event;
+    use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
     use ratatui::crossterm::style::Stylize;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::Style;
+    use ratatui::text::Line;
     use ratatui::widgets::{Block, Paragraph, Widget};
     use ratatui::{DefaultTerminal, Frame};
     use std::io;
-    use ratatui::crossterm::event;
-    use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-    use ratatui::text::{Line, Span};
-
-
 
     #[derive(Debug, Default)]
     pub struct MessageScreen {
@@ -85,7 +84,8 @@ pub mod terminal_ui {
         bin_data: Vec<Vec<String>>,
         exit: bool,
         active_pane: i32,
-        active_index: i32
+        active_index: i32,
+        current_screen: bool
     }
 
     impl MessageScreen {
@@ -109,7 +109,8 @@ pub mod terminal_ui {
                 bin_data: _data,
                 exit: false,
                 active_pane: Self::MESSAGES_PANE,
-                active_index: 0
+                active_index: 0,
+                current_screen: true
             }
         }
 
@@ -184,6 +185,14 @@ pub mod terminal_ui {
                 .render(view_pane_layout[0], buf);
         }
 
+        pub fn render_footer(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            Paragraph
+            ::new("Exit: [Esc / Q] | Open Binary: [O] | New Message: [N] | Select: [Enter]")
+                .centered()
+                .block(block)
+                .render(area, buf)
+        }
+
         pub fn load(&mut self) {
             ratatui::run(|terminal| self.run(terminal))
                 .expect("Error starting MessageViewScreen");
@@ -191,7 +200,7 @@ pub mod terminal_ui {
 
         pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
 
-            while !self.exit {
+            while !self.exit && self.current_screen {
                 terminal.draw(|frame| self.draw(frame))?;
                 self.handle_events()?;
             }
@@ -217,6 +226,8 @@ pub mod terminal_ui {
         pub fn handle_key_press_event(&mut self, key_event: KeyEvent) {
             match key_event.code {
                 KeyCode::Esc | KeyCode::Char('q') => { self.exit() }
+                KeyCode::Char('o') => { BinarySelectScreen::new().load(); self.current_screen = false }
+                KeyCode::Char('n') => {}
                 _ => { }
             }
         }
@@ -229,7 +240,8 @@ pub mod terminal_ui {
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(10),
-                    Constraint::Percentage(90)])
+                    Constraint::Percentage(80),
+                    Constraint::Percentage(10)])
                 .split(area);
 
             let column_layout = Layout::default()
@@ -247,37 +259,42 @@ pub mod terminal_ui {
             self.render_binary_overview(_styled.clone(), column_layout[0], buf);
             self.render_messages_pane(_styled.clone(), column_layout[1], buf);
             self.render_view_pane(_styled.clone(), column_layout[2], buf);
+            self.render_footer(_styled.clone(), title_layout[2], buf);
+
 
         }
     }
+
+}
+
+pub mod binary_select_ui {
+    use crate::app::app_config::get_option;
+    use crate::menu::message_view_ui::MessageScreen;
+    use ratatui::buffer::Buffer;
+    use ratatui::crossterm::event;
+    use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+    use ratatui::layout::{Layout, Rect};
+    use ratatui::prelude::{Constraint, Direction, Widget};
+    use ratatui::style::Style;
+    use ratatui::widgets::{Block, Paragraph};
+    use ratatui::{DefaultTerminal, Frame};
+    use std::io;
 
     #[derive(Debug, Default)]
-    pub struct MessageViewScreen {
-        title:              String,
-        file_name:          String,
-        binary_info:        Vec<String>,
-        unread_messages:    Vec<String>,
-        message_pane:       Vec<String>,
-        exit:               bool
+    pub struct BinarySelectScreen {
+        exit:       bool,
+        binaries:   Vec<String>,
+        current_screen: bool
     }
 
+    impl BinarySelectScreen {
 
-    impl MessageViewScreen {
-
-        pub fn new(title: String, file_name: String, binary_info: Vec<String>,
-                   unread_messages: Vec<String>, message_pane: Vec<String>, exit: bool) -> Self {
-            Self { title, file_name, binary_info, unread_messages, message_pane, exit }
+        pub fn new() -> Self {
+            Self { exit: false, binaries: Vec::new(), current_screen: true }
         }
 
-        pub fn from_empty() -> Self {
-            Self {
-                title: String::from("Message Title"),
-                file_name: String::from("TestMesFile.bin"),
-                binary_info: Vec::new(),
-                unread_messages: Vec::new(),
-                message_pane: Vec::new(),
-                exit: false
-            }
+        pub fn exit(&mut self) {
+            self.exit = true;
         }
 
         pub fn load(&mut self) {
@@ -285,13 +302,9 @@ pub mod terminal_ui {
                 .expect("Error starting MessageViewScreen");
         }
 
-        pub fn exit(&mut self) {
-            self.exit = true;
-        }
+        pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
 
-        pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()>{
-
-            while !self.exit {
+            while !self.exit && self.current_screen {
                 terminal.draw(|frame| self.draw(frame))?;
                 self.handle_events()?;
             }
@@ -305,115 +318,66 @@ pub mod terminal_ui {
 
         fn handle_events(&mut self) -> io::Result<()> {
             match event::read()? {
-                Event::Key(key_event)
-                if key_event.kind == KeyEventKind::Press => {
-                  self.handle_key_event(key_event) },
-                _ => {}
-            };
+                Event::Key(key_event) => {
+                    match key_event.kind {
+                        KeyEventKind::Press => self.handle_key_press_event(key_event),
+                        _ => {} } }
+                _ => { }
+            }
+
+
             Ok(())
         }
 
-        fn handle_key_event(&mut self, key_event: KeyEvent) {
+        pub fn handle_key_press_event(&mut self, key_event: KeyEvent) {
             match key_event.code {
-                KeyCode::Esc => self.exit(),
-                KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right => {
-                    self.handle_user_input(key_event) }
-                _ => {}
+                KeyCode::Esc | KeyCode::Char('q') => { self.current_screen = false; MessageScreen::from_empty().load() }
+                KeyCode::Enter => { }
+                _ => { }
             }
         }
 
-        fn handle_user_input(&mut self, key_event: KeyEvent) {
-
+        pub fn render_title(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            Paragraph::new("Rust Message Encoder")
+                .centered()
+                .block(block).render(area, buf);
         }
 
-        fn get_message_lines(&self) -> Vec<Line<'static>> {
-            let _lines: Vec<Line<'static>> = vec![
-                Line::styled("Create New Message", Style::new().reversed()),
-                "Message 1".into(),
-                "Message 2".into()
-            ];
-            _lines
+        pub fn render_footer(&self, block: Block, area: Rect, buf: &mut Buffer) {
+            Paragraph::new("Exit: [Esc / Q] | Select [Enter]")
+                .centered()
+                .block(block)
+                .render(area, buf)
         }
 
+        pub fn render_file_list(&self, block: Block, area: Rect, buf: &mut Buffer) {
+
+            let mut _t = String::from(" Files: [");
+            _t.push_str(get_option(&"message_binary_path".to_string()).as_str());
+            _t.push_str("] ");
+
+            Paragraph::new(_t)
+                .centered()
+                .block(block).render(area, buf);
+        }
     }
 
-    impl Widget for &MessageViewScreen {
+    impl Widget for &BinarySelectScreen {
         fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-
-            let title_layout = Layout::default()
+            let root_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Percentage(10),
-                    Constraint::Percentage(90)])
+                    Constraint::Percentage(80),
+                    Constraint::Percentage(10)])
                 .split(area);
 
-            let column_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(vec![
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(50)])
-                .split(title_layout[1]);
+            let styled_block = Block::bordered().style(Style::new().bold().light_blue());
 
-            let binary_overview_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(vec![
-                    Constraint::Percentage(5),
-                    Constraint::Percentage(95)])
-                .split(column_layout[0]);
-
-            let messages_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(vec![
-                    Constraint::Percentage(5),
-                    Constraint::Percentage(95)])
-                .split(column_layout[1]);
-
-            let message_pane_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(vec![
-                    Constraint::Percentage(5),
-                    Constraint::Percentage(95)])
-                .split(column_layout[2]);
-
-
-            let _styled = Block::bordered()
-                .style(Style::new().bold().light_blue());
-
-            /* Title Paragraph */
-            Paragraph::new("Rust Message Encoder").centered().block(
-                _styled.clone()).render(title_layout[0], buf);
-
-
-            /* Binary Overview */
-            Paragraph::new("")
-                .block(_styled.clone())
-                .render(column_layout[0], buf);
-            Paragraph::new(" Binary Overview ")
-                .centered()
-                .render(binary_overview_layout[0], buf);
-
-            /* Messages */
-            Paragraph::new("")
-                .block(_styled.clone())
-                .render(column_layout[1], buf);
-            Paragraph::new(" Messages ")
-                .centered()
-                .render(messages_layout[0], buf);
-            Paragraph::new(self.get_message_lines())
-                .centered()
-                .render(messages_layout[1], buf);
-
-            /* View Message Pane */
-            Paragraph::new("")
-                .block(_styled.clone())
-                .render(column_layout[2], buf);
-            Paragraph::new(" View Message ")
-                .centered()
-                .render(message_pane_layout[0], buf);
-
+            self.render_title(styled_block.clone(), root_layout[0], buf);
+            self.render_file_list(styled_block.clone(), root_layout[1], buf);
+            self.render_footer(styled_block.clone(), root_layout[2], buf);
         }
-
     }
 
 }

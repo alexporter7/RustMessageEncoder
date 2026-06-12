@@ -1,6 +1,6 @@
-use crate::menu::terminal_ui::MessageScreen;
-use crate::message::message::{Message, MessageBinary, MessageMetadata};
-use chrono::{Timelike, Utc};
+use crate::menu::message_view_ui::MessageScreen;
+use chrono::Timelike;
+use crate::app::app_state::{AppState, Screen};
 
 pub mod message;
 pub mod menu;
@@ -10,16 +10,27 @@ pub mod util;
 
 fn main() {
 
-    // let mut mvc = MessageViewScreen::from_empty();
-    //
-    // mvc.load();
+    let mut current_screen = AppState::new();
 
     let mut mvc2 = MessageScreen::from_empty();
-    //mvc2.load();
+    mvc2.load();
 
-    let mut test_bin = MessageBinary::from_file("RealTest1.bin");
+    // loop {
+    //     match current_screen.get_app_screen() {
+    //         Screen::None => { }
+    //         Screen::ViewMessageScreen => { }
+    //         Screen::OpenBinaryScreen => { }
+    //         Screen::NewMessageScreen => { }
+    //         _ => { }
+    //     }
+    // }
 
-    println!("{test_bin}");
+
+
+
+    //let mut test_bin = MessageBinary::from_file("RealTest1.bin");
+
+    //println!("{test_bin}");
 
 
     // let mut test_bin =

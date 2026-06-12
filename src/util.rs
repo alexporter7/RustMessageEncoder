@@ -65,7 +65,7 @@ pub mod menu_util {
 
 pub mod term_util {
     use ratatui::prelude::Line;
-    use crate::menu::terminal_ui::MessageScreen;
+    use crate::menu::message_view_ui::MessageScreen;
 
     pub fn get_messages(screen: &MessageScreen) -> Vec<Line<'static>> {
 

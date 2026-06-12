@@ -19,7 +19,7 @@ pub mod app_config {
     pub fn get_option(name: &String) -> String {
         let _config = get_config();
         let _val = _config.get(name);
-        _val.unwrap().to_string()
+        _val.expect("Error parsing option").to_string()
 
     }
 
@@ -50,5 +50,31 @@ pub mod app_files {
     pub fn get_message_pages() {
 
     }
+
+}
+
+pub mod app_state {
+    pub enum Screen {
+        None,
+        ViewMessageScreen,
+        OpenBinaryScreen,
+        NewMessageScreen
+    }
+
+    pub struct AppState {
+        current_screen: Screen
+    }
+
+    impl AppState {
+
+        pub fn new() -> Self {
+            Self { current_screen: Screen::None}
+        }
+
+        pub fn get_app_screen(&mut self) -> &Screen {
+            &self.current_screen
+        }
+    }
+
 
 }
