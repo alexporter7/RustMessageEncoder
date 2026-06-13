@@ -65,22 +65,21 @@ pub mod menu {
 
 }
 
+//TODO: some of this ui stuff can be abstracted, I'm just not good enough at rust yet to effectively do it right now
 pub mod message_view_ui {
-    use std::cmp::min;
     use crate::menu::binary_select_ui::BinarySelectScreen;
+    use crate::message::message::MessageBinary;
+    use crate::util::term_util::ScrollDirection;
     use ratatui::buffer::Buffer;
     use ratatui::crossterm::event;
     use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-    use ratatui::crossterm::style::Stylize;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::Style;
     use ratatui::text::Line;
     use ratatui::widgets::{Block, Paragraph, Widget};
     use ratatui::{DefaultTerminal, Frame};
+    use std::cmp::min;
     use std::io;
-    use rand::distributions::uniform::SampleBorrow;
-    use crate::message::message::MessageBinary;
-    use crate::util::term_util::ScrollDirection;
 
     #[derive(Debug, Default)]
     pub struct MessageScreen {
@@ -91,7 +90,8 @@ pub mod message_view_ui {
         active_index: usize,
         current_screen: bool,
         scroll_direction: ScrollDirection,
-        last_offset: usize
+        last_offset: usize,
+        view_message_index: usize
     }
 
     impl MessageScreen {
@@ -122,7 +122,8 @@ pub mod message_view_ui {
                 active_index: 0,
                 current_screen: true,
                 scroll_direction: ScrollDirection::None,
-                last_offset: 0
+                last_offset: 0,
+                view_message_index: 0
             }
         }
 
@@ -187,7 +188,6 @@ pub mod message_view_ui {
             let _mes_in_bin = format!("Messages in Binary: {}", _bin.mes_in_binary);
 
             let _binary_overview_lines = vec![
-                //Line::styled(" Binary Overview ", Self::PG_DEFAULT_STYLE),
                 Line::styled(_bin_name, Self::PG_DEFAULT_STYLE),
                 Line::styled(_mes_in_bin, Self::PG_DEFAULT_STYLE),
             ];
@@ -226,12 +226,6 @@ pub mod message_view_ui {
 
             for i in 0.._max_iterations as usize {
                 let mut _offset: usize = self.get_offset();
-                // if self.active_index < (Self::MAX_MESSAGE_LINES - 1) {
-                //     _offset = 0;
-                //
-                // } else {
-                //     _offset = self.active_index - (Self::MAX_MESSAGE_LINES - 1);
-                // }
 
                 let _adjusted_index = i + _offset;
                 let _mes = _bin_data.get(_adjusted_index).unwrap();
@@ -243,10 +237,6 @@ pub mod message_view_ui {
                 }
 
             }
-
-            // for message in _bin_data {
-            //     _lines.push(Line::styled(message, Self::PG_DEFAULT_STYLE));
-            // }
 
             /* Messages */
             Paragraph::new("")
@@ -269,17 +259,44 @@ pub mod message_view_ui {
                     Constraint::Percentage(95)])
                 .split(area);
 
+            let view_pane_inner = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(5),
+                    Constraint::Percentage(90)])
+                .margin(1)
+                .split(view_pane_layout[1]);
+
+            let _messages = &self.loaded_binary.as_ref().unwrap().messages;
+            if _messages.len() != 0 {
+                let _message = _messages.get(self.view_message_index).unwrap();
+
+                let _name = _message.name.clone();
+                let _author = _message.author.clone();
+                let _content = _message.content.clone();
+
+                Paragraph::new(format!(" Message Name: {}", _name))
+                    .render(view_pane_inner[0], buf);
+                Paragraph::new(format!(" Author: {}", _author))
+                    .render(view_pane_inner[1], buf);
+                Paragraph::new(_content).left_aligned()
+                    .render(view_pane_inner[2], buf);
+            }
+
             /* View Message Pane */
             Paragraph::new("")
-                .block(block)
+                .block(block.clone())
                 .render(area, buf);
             Paragraph::new(" View Message ")
                 .centered()
-                .render(view_pane_layout[0], buf);
+                .render(area, buf);
+
 
             // Paragraph::new(vec![
             //     Line::styled(format!("Last Offset: {}", self.last_offset), Self::PG_DEFAULT_STYLE),
-            //     Line::styled(format!("Active Index: {}", self.active_index), Self::PG_DEFAULT_STYLE)])
+            //     Line::styled(format!("Active Index: {}", self.active_index), Self::PG_DEFAULT_STYLE),
+            //     Line::styled(format!("View Index: {}", self.view_message_index), Self::PG_DEFAULT_STYLE)])
             //     .centered()
             //     .render(view_pane_layout[1], buf);
         }
@@ -343,6 +360,13 @@ pub mod message_view_ui {
                         self.scroll_direction = ScrollDirection::Down
                     }
                 }
+                KeyCode::Enter => {
+                    let _mes_index = self.active_index;
+                    self.view_message_index = _mes_index;
+                    // let _messages = self.loaded_binary.as_ref()
+                    //     .expect("Unable to access loaded binary");
+                    // let _message = _messages.messages.get(self.active_index);
+                }
                 _ => { }
             }
         }
@@ -383,8 +407,11 @@ pub mod message_view_ui {
 }
 
 pub mod binary_select_ui {
-    use crate::app::app_config::{get_option, MESSAGE_BINARY_PATH};
+    use crate::app::app_config;
+    use crate::app::app_config::get_option;
     use crate::menu::message_view_ui::MessageScreen;
+    use crate::message::message;
+    use crate::util::file_util::get_directory_files;
     use ratatui::buffer::Buffer;
     use ratatui::crossterm::event;
     use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
@@ -394,9 +421,6 @@ pub mod binary_select_ui {
     use ratatui::widgets::{Block, Paragraph};
     use ratatui::{DefaultTerminal, Frame};
     use std::io;
-    use crate::app::app_config;
-    use crate::message::message;
-    use crate::util::file_util::get_directory_files;
 
     #[derive(Debug, Default)]
     pub struct BinarySelectScreen {
@@ -568,4 +592,8 @@ pub mod binary_select_ui {
         }
     }
 
+}
+
+pub mod main_menu_ui {
+    
 }

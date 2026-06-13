@@ -47,13 +47,5 @@ pub mod app_data {
 
 }
 
-pub mod app_files {
-    use ratatui::prelude::Line;
-    use crate::app::app_config;
-    use crate::app::app_config::get_option;
-    use crate::util::file_util::get_directory_files;
-
-
-
-}
+pub mod app_files {}
 
